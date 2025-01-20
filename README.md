@@ -1,1 +1,1 @@
-# i7ptcalculator-github.io
+# i7ptcalculator
