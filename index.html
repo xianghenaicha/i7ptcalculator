@@ -14,6 +14,10 @@
             text-align: center;
             color: #333;
         }
+        h3 {
+            text-align: center;
+            color: red;
+        }
         .input-section {
             margin-bottom: 20px;
         }
@@ -55,7 +59,8 @@
 <body>
 
     <h1>爱豆历史赛文pt计算器</h1>
-    
+    <h3>一定要自己验算一下啊。只能算四位数的单倍pt，全都是满等满训overscore150%的情况，如果显示缺一张卡就是按200lv两张150lv且能满overscore，缺的最好自己算。</h3>
+
     <div class="input-section">
         <label for="target">请输入目标分数：</label>
         <input type="number" id="target" placeholder="例如：3881">
@@ -80,22 +85,22 @@
                 "expert": 1000
             };
 
-            const starMultipliers = [1.2, 1.23, 1.25, 1.28, 1.3]; // 星级加成
+            const starMultipliers = [1, 1.2, 1.23, 1.25, 1.28, 1.3]; // 星级加成（包含 AUTO 的1 值）
             const fullComboScores = {
                 "easy": 140,
                 "normal": 165,
                 "hard": 191,
                 "expert": 255
             };
-            const fixedScore = 570; // 固定加分
+            let fixedScore = 570; // 默认固定加分
 
             // 卡片加成组合
             const cardCombinations = [];
-            for (let num0 = 0; num0 <= 5; num0++) {
-                for (let num5 = 0; num5 <= 5; num5++) {
-                    for (let num20 = 0; num20 <= 5; num20++) {
-                        for (let num50 = 0; num50 <= 5; num50++) {
-                            if (num0 + num5 + num20 + num50 <= 5) {
+            for (let num0 = 0; num0 <= 6; num0++) {
+                for (let num5 = 0; num5 <= 6; num5++) {
+                    for (let num20 = 0; num20 <= 6; num20++) {
+                        for (let num50 = 0; num50 <= 6; num50++) {
+                            if (num0 + num5 + num20 + num50 <= 6) {
                                 const totalMultiplier = 1 + (0 * num0) + (0.05 * num5) + (0.2 * num20) + (0.5 * num50);
                                 cardCombinations.push({ totalMultiplier, num0, num5, num20, num50 });
                             }
@@ -104,59 +109,61 @@
                 }
             }
 
-            // 好友卡加成
-            const friendCardMultipliers = [0, 0.05, 0.2, 0.5];
-
             // 结果存储
             let solutions = [];
             let closeSolutions = [];
 
             // 穷举所有变量组合
             for (let difficulty in difficultyScores) {
-                for (let stars = 1; stars <= 5; stars++) {
-                    const starMultiplier = starMultipliers[stars - 1];
+                for (let stars = 0; stars <= 5; stars++) { // 星级从0（AUTO）开始
+                    const starMultiplier = starMultipliers[stars];
+                    const fullCombo = stars === 0 ? 0 : fullComboScores[difficulty]; // AUTO星级无全连分
+
                     for (let { totalMultiplier, num0, num5, num20, num50 } of cardCombinations) {
-                        for (let friendCardMultiplier of friendCardMultipliers) {
-                            const fullCombo = fullComboScores[difficulty];
+                        // 缺少 SSR 的数量
+                        const missingSsr = 6 - (num0 + num5 + num20 + num50);
 
-                            // 总卡片加成
-                            const totalMultiplierWithFriend = totalMultiplier + friendCardMultiplier;
+                        // 如果缺少SSR的数量不符合规则，跳过
+                        if (missingSsr < 0 || (num5 + num20 + num50) < 4) continue;
 
-                            // 缺少 SSR 的数量
-                            const missingSsr = 5 - (num0 + num5 + num20 + num50);
+                        // 根据缺少的SSR调整固定加分
+                        if (missingSsr === 1) {
+                            fixedScore = 530;
+                        } else if (missingSsr === 2) {
+                            fixedScore = 510;
+                        } else {
+                            fixedScore = 570;
+                        }
 
-                            // 计算当前组合的分数
-                            const pt = Math.floor(Math.floor(difficultyScores[difficulty] * starMultiplier) * totalMultiplierWithFriend) + fullCombo + fixedScore - missingSsr * 10;
+                        // 计算当前组合的分数
+                        const pt = Math.floor(Math.floor(difficultyScores[difficulty] * starMultiplier) * totalMultiplier) + fullCombo + fixedScore - missingSsr * 10;
 
-                            // 匹配目标分数
-                            if (pt === targetPt) {
-                                solutions.push({
-                                    difficulty,
-                                    stars,
-                                    cardMultiplier: Math.round((totalMultiplier - 1) * 100),  // 计算卡片加成百分比
-                                    friendCardMultiplier: Math.round(friendCardMultiplier * 100),  // 好友卡加成百分比
-                                    num0,
-                                    num5,
-                                    num20,
-                                    num50,
-                                    missingSsr,
-                                    calculatedPt: pt
-                                });
-                            } else if (Math.abs(pt - targetPt) % 10 === 0 && Math.abs(pt - targetPt) <= 50) {
-                                closeSolutions.push({
-                                    difficulty,
-                                    stars,
-                                    cardMultiplier: Math.round((totalMultiplier - 1) * 100),
-                                    friendCardMultiplier: Math.round(friendCardMultiplier * 100),
-                                    num0,
-                                    num5,
-                                    num20,
-                                    num50,
-                                    missingSsr,
-                                    calculatedPt: pt,
-                                    difference: Math.abs(pt - targetPt)
-                                });
-                            }
+                        // 匹配目标分数
+                        if (pt === targetPt) {
+                            solutions.push({
+                                difficulty,
+                                stars: stars === 0 ? "AUTO" : stars,
+                                cardMultiplier: Math.round((totalMultiplier - 1) * 100),  // 计算卡片加成百分比
+                                num0,
+                                num5,
+                                num20,
+                                num50,
+                                missingSsr,
+                                calculatedPt: pt
+                            });
+                        } else if (Math.abs(pt - targetPt) % 10 === 0 && Math.abs(pt - targetPt) <= 50) {
+                            closeSolutions.push({
+                                difficulty,
+                                stars: stars === 0 ? "AUTO" : stars,
+                                cardMultiplier: Math.round((totalMultiplier - 1) * 100),
+                                num0,
+                                num5,
+                                num20,
+                                num50,
+                                missingSsr,
+                                calculatedPt: pt,
+                                difference: Math.abs(pt - targetPt)
+                            });
                         }
                     }
                 }
@@ -171,8 +178,7 @@
                                     <tr>
                                         <th>难度</th>
                                         <th>星级</th>
-                                        <th>自己卡片加成</th>
-                                        <th>好友卡加成</th>
+                                        <th>卡片加成</th>
                                         <th>0%卡</th>
                                         <th>5%卡</th>
                                         <th>20%卡</th>
@@ -187,7 +193,6 @@
                                 <td>${solution.difficulty}</td>
                                 <td>${solution.stars}</td>
                                 <td>${solution.cardMultiplier}%</td>
-                                <td>${solution.friendCardMultiplier}%</td>
                                 <td>${solution.num0}</td>
                                 <td>${solution.num5}</td>
                                 <td>${solution.num20}</td>
@@ -210,8 +215,7 @@
                                     <tr>
                                         <th>难度</th>
                                         <th>星级</th>
-                                        <th>自己卡片加成</th>
-                                        <th>好友卡加成</th>
+                                        <th>卡片加成</th>
                                         <th>0%卡</th>
                                         <th>5%卡</th>
                                         <th>20%卡</th>
@@ -227,7 +231,6 @@
                                 <td>${solution.difficulty}</td>
                                 <td>${solution.stars}</td>
                                 <td>${solution.cardMultiplier}%</td>
-                                <td>${solution.friendCardMultiplier}%</td>
                                 <td>${solution.num0}</td>
                                 <td>${solution.num5}</td>
                                 <td>${solution.num20}</td>
